@@ -1,0 +1,305 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <is.xyz.mpv.MPVView
+        android:id="@+id/player"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <!-- so that insets can be applied as margins -->
+    <RelativeLayout
+        android:id="@+id/outside"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <View
+            android:id="@+id/bottomGradient"
+            android:layout_width="match_parent"
+            android:layout_height="120dp"
+            android:layout_alignParentBottom="true"
+            android:background="@drawable/bottom_gradient"
+            android:visibility="gone"
+            tools:visibility="visible" />
+
+        <LinearLayout
+            android:id="@+id/controls"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_alignParentBottom="true"
+            android:orientation="vertical"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:paddingBottom="16dp"
+            android:visibility="gone"
+            tools:visibility="visible">
+
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+                <Button
+                    android:id="@+id/skipIntroBtn"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentEnd="true"
+                    android:layout_marginBottom="8dp"
+                    android:backgroundTint="@color/skip_button_bg"
+                    android:textColor="@android:color/white"
+                    android:text="@string/skip_intro"
+                    android:visibility="gone"
+                    tools:visibility="visible" />
+            </RelativeLayout>
+
+            <!-- Top row -->
+            <LinearLayout
+                android:id="@+id/controls_top_row"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layoutDirection="ltr">
+
+                <ImageButton
+                    android:id="@+id/hamburgerMenuBtn"
+                    style="?buttonBarButtonStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    app:srcCompat="@drawable/ic_menu_24dp"
+                    app:tint="@color/tint_normal" />
+
+                <ImageButton
+                    android:id="@+id/playlistPrevBtn"
+                    style="?buttonBarButtonStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    app:srcCompat="@drawable/ic_skip_previous_black_24dp"
+                    app:tint="@color/tint_normal" />
+
+                <ImageButton
+                    android:id="@+id/playBtn"
+                    style="?buttonBarButtonStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    app:tint="@color/tint_normal"
+                    tools:src="@drawable/ic_pause_black_24dp" />
+
+                <ImageButton
+                    android:id="@+id/playlistNextBtn"
+                    style="?buttonBarButtonStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    app:srcCompat="@drawable/ic_skip_next_black_24dp"
+                    app:tint="@color/tint_normal" />
+
+                <TextView
+                    android:id="@+id/fullTitleTextView"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:singleLine="true"
+                    android:textColor="@color/tint_normal"
+                    android:textSize="18sp"
+                    android:layout_marginStart="8dp"
+                    tools:text="Slime Diaries Episode 7" />
+            </LinearLayout>
+
+            <!-- Bottom row -->
+            <LinearLayout
+                android:id="@+id/controls_bottom_row"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layoutDirection="ltr"
+                android:layout_marginTop="4dp">
+
+                <ImageButton
+                    android:id="@+id/rewindBtn"
+                    style="?buttonBarButtonStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    app:srcCompat="@drawable/ic_replay_10_24dp"
+                    app:tint="@color/tint_normal" />
+
+                <ImageButton
+                    android:id="@+id/forwardBtn"
+                    style="?buttonBarButtonStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    app:srcCompat="@drawable/ic_forward_10_24dp"
+                    app:tint="@color/tint_normal" />
+
+                <ImageButton
+                    android:id="@+id/prevBtn"
+                    style="?buttonBarButtonStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    app:srcCompat="@drawable/ic_skip_previous_black_24dp"
+                    app:tint="@color/tint_normal" />
+
+                <ImageButton
+                    android:id="@+id/nextBtn"
+                    style="?buttonBarButtonStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    app:srcCompat="@drawable/ic_skip_next_black_24dp"
+                    app:tint="@color/tint_normal" />
+
+                <TextView
+                    android:id="@+id/playbackPositionTxt"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="@android:color/white"
+                    android:layout_marginStart="4dp"
+                    android:layout_marginEnd="4dp"
+                    tools:text="00:18:02" />
+
+                <SeekBar
+                    android:id="@+id/playbackSeekbar"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:minHeight="24dp"
+                    android:progressBackgroundTint="@color/tint_seekbar_bg" />
+
+                <TextView
+                    android:id="@+id/playbackDurationTxt"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="@android:color/white"
+                    android:layout_marginStart="4dp"
+                    android:layout_marginEnd="4dp"
+                    tools:text="-00:05:58" />
+
+                <ImageButton
+                    android:id="@+id/cycleAudioBtn"
+                    style="?buttonBarButtonStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    app:srcCompat="@drawable/ic_audiotrack_black_24dp"
+                    app:tint="@color/tint_normal" />
+
+                <ImageButton
+                    android:id="@+id/cycleSubsBtn"
+                    style="?buttonBarButtonStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    app:srcCompat="@drawable/ic_subtitles_black_24dp"
+                    app:tint="@color/tint_normal" />
+
+                <ImageButton
+                    android:id="@+id/volumeBtn"
+                    style="?buttonBarButtonStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    app:srcCompat="@drawable/ic_volume_up_24dp"
+                    app:tint="@color/tint_normal" />
+
+                <ImageButton
+                    android:id="@+id/fullscreenBtn"
+                    style="?buttonBarButtonStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    app:srcCompat="@drawable/ic_fullscreen_24dp"
+                    app:tint="@color/tint_normal" />
+
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Keep these the same -->
+        <TextView
+            android:id="@+id/statsTextView"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentStart="true"
+            android:layout_alignParentTop="true"
+            android:layout_marginStart="16dp"
+            android:shadowColor="#000000"
+            android:shadowDx="1"
+            android:shadowDy="1"
+            android:shadowRadius="1"
+            android:textColor="#00FF00"
+            android:visibility="gone"
+            tools:text="60 FPS" />
+
+        <TextView
+            android:id="@+id/gestureTextView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:shadowColor="#000000"
+            android:shadowDx="0"
+            android:shadowDy="0"
+            android:shadowRadius="4"
+            android:textAlignment="center"
+            android:textColor="#ffffff"
+            android:textSize="36sp"
+            android:textStyle="bold"
+            android:visibility="gone"
+            tools:text="[gesture]" />
+
+        <LinearLayout
+            android:id="@+id/top_controls"
+            style="?buttonBarStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentTop="true"
+            android:layout_alignParentEnd="true"
+            android:alpha="0.5"
+            android:background="#00000000"
+            android:orientation="horizontal">
+
+            <ImageButton
+                android:id="@+id/topLockBtn"
+                style="?buttonBarButtonStyle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minWidth="40dp"
+                android:minHeight="40dp"
+                android:padding="4dp"
+                app:srcCompat="@drawable/ic_lock_24dp"
+                app:tint="@color/tint_normal" />
+
+            <ImageButton
+                android:id="@+id/topPiPBtn"
+                style="?buttonBarButtonStyle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minWidth="40dp"
+                android:minHeight="40dp"
+                android:padding="4dp"
+                app:srcCompat="@drawable/ic_picture_in_picture_24dp"
+                app:tint="@color/tint_normal" />
+
+            <ImageButton
+                android:id="@+id/topMenuBtn"
+                style="?buttonBarButtonStyle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minWidth="40dp"
+                android:minHeight="40dp"
+                android:padding="4dp"
+                app:srcCompat="@drawable/ic_settings_black_24dp"
+                app:tint="@color/tint_normal" />
+
+        </LinearLayout>
+
+        <ImageButton
+            android:id="@+id/unlockBtn"
+            android:layout_width="48dp"
+            android:layout_height="52dp"
+            android:layout_alignParentTop="true"
+            android:layout_alignParentEnd="true"
+            android:layout_marginStart="24dp"
+            android:layout_marginTop="24dp"
+            android:layout_marginEnd="24dp"
+            android:layout_marginBottom="24dp"
+            android:visibility="gone"
+            app:srcCompat="@drawable/ic_lock_open_24dp" />
+
+    </RelativeLayout>
+</RelativeLayout>

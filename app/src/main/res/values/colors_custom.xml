@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="menu_background">#1A1D24</color>
+    <color name="menu_divider">#444444</color>
+    <color name="menu_text_hint">#888888</color>
+    <color name="skip_button_bg">#222222</color>
+</resources>
