@@ -27,7 +27,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.PlayArrow
+import android.widget.Toast
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -238,6 +240,7 @@ fun DetailsContent(
                             )
                         }
                         Spacer(Modifier.width(10.dp))
+                        val context = LocalContext.current
                         Box(
                             modifier = Modifier
                                 .size(42.dp)
@@ -250,6 +253,28 @@ fun DetailsContent(
                                 imageVector = if (saved) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
                                 contentDescription = "Watchlist",
                                 tint = if (saved) MaterialTheme.colorScheme.primary else Color.White,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+                        Spacer(Modifier.width(10.dp))
+                        Box(
+                            modifier = Modifier
+                                .size(42.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                .clickable {
+                                    Toast.makeText(
+                                        context,
+                                        "Download queued: ${loaded.name}",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Download,
+                                contentDescription = "Download",
+                                tint = Color.White,
                                 modifier = Modifier.size(20.dp),
                             )
                         }
