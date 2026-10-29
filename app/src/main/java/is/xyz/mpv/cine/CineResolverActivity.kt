@@ -122,6 +122,12 @@ class CineResolverActivity : ComponentActivity() {
         seasonNumber = season ?: 0
         episodeNumber = episode ?: 0
         startMs = intent.getIntExtra(EXTRA_START_MS, 0)
+        if (startMs <= 0) {
+            val saved = CineLibrary.progress(this, cacheKey)
+            if (saved != null && saved.isResumable) {
+                startMs = (saved.positionMs - 2_000L).coerceAtLeast(0L).toInt()
+            }
+        }
 
         if (imdb.isBlank()) {
             Toast.makeText(this, "Missing title id", Toast.LENGTH_LONG).show()
@@ -470,6 +476,7 @@ class CineResolverActivity : ComponentActivity() {
             putExtra("title", label)
             putExtra("Referer", referer)
             putExtra("User-Agent", userAgent)
+            putExtra("anime_track", cacheKey)
             // Start on the first available frame instead of filling the cache.
             putExtra("mpv_opts", "cache-pause=no\ndemuxer-readahead-secs=1")
             if (!cookie.isNullOrBlank()) putExtra("headers", "Cookie: $cookie")
