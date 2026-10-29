@@ -78,6 +78,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import `is`.xyz.mpv.preferences.PreferenceActivity
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -141,6 +142,17 @@ fun CineApp() {
     var homeLoading by remember { mutableStateOf(true) }
     var homeError by remember { mutableStateOf<String?>(null) }
     var reloadTick by remember { mutableIntStateOf(0) }
+
+    var updateInfo by remember { mutableStateOf<CineUpdateInfo?>(null) }
+    var showUpdateDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        val info = CineUpdateChecker.checkForUpdates()
+        if (info.isUpdateAvailable) {
+            updateInfo = info
+            showUpdateDialog = true
+        }
+    }
 
     LaunchedEffect(reloadTick) {
         homeLoading = true
@@ -243,6 +255,10 @@ fun CineApp() {
 
                     is CineScreen.Settings -> SettingsContent(
                         onBack = { screen = CineScreen.Home },
+                        onTriggerUpdate = { info ->
+                            updateInfo = info
+                            showUpdateDialog = true
+                        }
                     )
 
                     is CineScreen.Grid -> CatalogGridScreen(
@@ -278,6 +294,61 @@ fun CineApp() {
                             history = CineLibrary.history(context)
                             playRequest = null
                         },
+                    )
+                }
+
+                if (showUpdateDialog && updateInfo != null) {
+                    val info = updateInfo!!
+                    AlertDialog(
+                        onDismissRequest = { showUpdateDialog = false },
+                        title = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Default.Refresh,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(info.title.ifBlank { "Update Available: ${info.tagName}" })
+                            }
+                        },
+                        text = {
+                            Column {
+                                Text(
+                                    "A new version (${info.tagName}) of CineVerse is available!",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                                Spacer(Modifier.height(8.dp))
+                                Text(
+                                    "What's New:",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    info.notes,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    showUpdateDialog = false
+                                    CineUpdateChecker.openUpdateUrl(context, info)
+                                }
+                            ) {
+                                Text("Update Now")
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showUpdateDialog = false }) {
+                                Text("Later")
+                            }
+                        }
                     )
                 }
             }
@@ -899,11 +970,16 @@ private fun LibraryContent(
 // ------------------------------------------------------------------- settings
 
 @Composable
-private fun SettingsContent(onBack: () -> Unit) {
+private fun SettingsContent(
+    onBack: () -> Unit,
+    onTriggerUpdate: (CineUpdateInfo) -> Unit,
+) {
     val context = LocalContext.current
+    val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
     var cleared by remember { mutableStateOf(false) }
     var quality by remember { mutableStateOf(CinePrefs.quality(context)) }
     var showQuality by remember { mutableStateOf(false) }
+    var checkingUpdate by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxSize()) {
         AppHeader(title = "Settings", onBack = onBack)
@@ -977,6 +1053,38 @@ private fun SettingsContent(onBack: () -> Unit) {
             }
             item {
                 Spacer(Modifier.height(8.dp))
+                Text(
+                    text = "Updates & About",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            item {
+                SettingsRow(
+                    icon = Icons.Default.Refresh,
+                    title = "Check for updates",
+                    subtitle = if (checkingUpdate) "Checking GitHub for updates..." else "Check for new app releases (${CineUpdateChecker.CURRENT_VERSION_TAG})",
+                    onClick = {
+                        if (checkingUpdate) return@SettingsRow
+                        checkingUpdate = true
+                        coroutineScope.launch {
+                            val info = CineUpdateChecker.checkForUpdates()
+                            checkingUpdate = false
+                            if (info.isUpdateAvailable) {
+                                onTriggerUpdate(info)
+                            } else {
+                                Toast.makeText(
+                                    context,
+                                    "CineVerse is up to date (${CineUpdateChecker.CURRENT_VERSION_TAG})",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        }
+                    },
+                )
+            }
+            item {
+                Spacer(Modifier.height(8.dp))
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline)
                 Spacer(Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -987,7 +1095,7 @@ private fun SettingsContent(onBack: () -> Unit) {
                     )
                     Spacer(Modifier.width(10.dp))
                     Column {
-                        Text("CineVerse 1.0", fontWeight = FontWeight.Medium)
+                        Text("CineVerse ${CineUpdateChecker.CURRENT_VERSION_TAG}", fontWeight = FontWeight.Medium)
                         Text(
                             "Catalogue by Cinemeta · playback by libmpv",
                             style = MaterialTheme.typography.labelSmall,
