@@ -1794,7 +1794,7 @@ class MPVActivity : AppCompatActivity(), MPVLib.EventObserver, TouchGesturesObse
         val menuItems = listOf(
             MenuAdapter.MenuRow("Audio", audioName) { dialog.dismiss(); pickAudio() },
             MenuAdapter.MenuRow("Subtitles", subName) { dialog.dismiss(); pickSub() },
-            MenuAdapter.MenuRow("Quality", CinePrefs.qualityLabel(this)) {
+            MenuAdapter.MenuRow("Quality", CinePrefs.qualityLabel(CinePrefs.quality(this))) {
                 dialog.dismiss()
                 showQualityDialog()
             },

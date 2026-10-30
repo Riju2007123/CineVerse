@@ -586,7 +586,7 @@ private fun HomeContent(
                 PosterRow(
                     title = spec.title,
                     items = items,
-                    loading = false,
+                    progressMap = progressMap,
                     onOpen = onOpen,
                     onSeeAll = { onSeeAll(spec) },
                 )
@@ -1214,9 +1214,41 @@ private fun DownloadRow(
 // ------------------------------------------------------------------- settings
 
 @Composable
+private fun SwitchSettingsRow(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    reduceMotion: Boolean = false
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .clickable { onCheckedChange(!checked) }
+            .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+            Spacer(Modifier.height(2.dp))
+            Text(subtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Spacer(Modifier.width(12.dp))
+        CustomSwitch(checked = checked, onCheckedChange = onCheckedChange, reduceMotion = reduceMotion)
+    }
+}
+
+@Composable
 private fun SettingsContent(
     onBack: () -> Unit,
     onTriggerUpdate: (CineUpdateInfo) -> Unit,
+    themeMode: String = "dark",
+    accentIndex: Int = 0,
+    onThemeChange: (String) -> Unit = {},
+    onAccentChange: (Int) -> Unit = {}
 ) {
     val context = LocalContext.current
     val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
@@ -1224,14 +1256,18 @@ private fun SettingsContent(
     var quality by remember { mutableStateOf(CinePrefs.quality(context)) }
     var showQuality by remember { mutableStateOf(false) }
     var checkingUpdate by remember { mutableStateOf(false) }
-    var folderName by remember { mutableStateOf(CineDownloads.treeName(context)) }
-    var downloadCount by remember { mutableIntStateOf(CineDownloads.list(context).size) }
+
+    var autoplayNext by remember { mutableStateOf(CinePrefs.autoplayNext(context)) }
+    var autoplayPreviews by remember { mutableStateOf(CinePrefs.autoplayPreviews(context)) }
+    var skipIntro by remember { mutableStateOf(CinePrefs.skipIntro(context)) }
+    var wifiOnly by remember { mutableStateOf(CinePrefs.wifiOnly(context)) }
+    var reduceMotion by remember { mutableStateOf(CinePrefs.reduceMotion(context)) }
+
     val folderLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
     ) { uri ->
         if (uri != null) {
             CineDownloads.setTreeUri(context, uri)
-            folderName = CineDownloads.treeName(context)
             Toast.makeText(context, "Download folder set", Toast.LENGTH_SHORT).show()
         }
     }
@@ -1241,125 +1277,274 @@ private fun SettingsContent(
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
+            // Profile Card
             item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainer)
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(52.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "J",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+                    Spacer(Modifier.width(14.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Jack",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "Synced · 2 devices",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Text(
+                        text = "Edit",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .clickable { }
+                            .padding(horizontal = 14.dp, vertical = 6.dp)
+                    )
+                }
+            }
+
+            // PLAYBACK
+            item {
+                Spacer(Modifier.height(4.dp))
                 Text(
-                    text = "Catalogue",
+                    text = "PLAYBACK",
                     style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+            item {
+                SwitchSettingsRow(
+                    title = "Autoplay next episode",
+                    subtitle = "Starts after the credits",
+                    checked = autoplayNext,
+                    onCheckedChange = {
+                        autoplayNext = it
+                        CinePrefs.setAutoplayNext(context, it)
+                    },
+                    reduceMotion = reduceMotion
+                )
+            }
+            item {
+                SwitchSettingsRow(
+                    title = "Autoplay previews",
+                    subtitle = "Short clips while browsing",
+                    checked = autoplayPreviews,
+                    onCheckedChange = {
+                        autoplayPreviews = it
+                        CinePrefs.setAutoplayPreviews(context, it)
+                    },
+                    reduceMotion = reduceMotion
+                )
+            }
+            item {
+                SwitchSettingsRow(
+                    title = "Skip intro button",
+                    subtitle = "Show when available",
+                    checked = skipIntro,
+                    onCheckedChange = {
+                        skipIntro = it
+                        CinePrefs.setSkipIntro(context, it)
+                    },
+                    reduceMotion = reduceMotion
                 )
             }
             item {
                 SettingsRow(
                     icon = Icons.Default.Tv,
-                    title = "Cinemeta (IMDb catalogue)",
-                    subtitle = "Free, no API key · movies, series, episodes, ratings",
-                    onClick = { },
+                    title = "Default quality",
+                    subtitle = CinePrefs.qualityLabel(quality),
+                    onClick = { showQuality = true }
+                )
+            }
+
+            // DOWNLOADS
+            item {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = "DOWNLOADS",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+            item {
+                SwitchSettingsRow(
+                    title = "Wi-Fi only",
+                    subtitle = "Save mobile data",
+                    checked = wifiOnly,
+                    onCheckedChange = {
+                        wifiOnly = it
+                        CinePrefs.setWifiOnly(context, it)
+                    },
+                    reduceMotion = reduceMotion
                 )
             }
             item {
                 SettingsRow(
-                    icon = Icons.Default.Refresh,
-                    title = "Reload catalogue",
-                    subtitle = "Clear cached rows, streams and images",
-                    onClick = {
-                        CinemetaApi.clearCache()
-                        CineStreamCache.clear(context)
-                        cleared = true
-                    },
+                    icon = Icons.Default.Download,
+                    title = "Download quality",
+                    subtitle = "Standard >",
+                    onClick = { }
                 )
             }
-            if (cleared) {
-                item {
-                    Text(
-                        text = "Caches cleared.",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainer)
+                        .padding(14.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Storage used", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                        Text("4.2 GB of 64 GB", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    AnimatedProgressBar(fraction = 4.2f / 64f, reduceMotion = reduceMotion)
+                }
+            }
+
+            // APPEARANCE
+            item {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = "APPEARANCE",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf("dark" to "Dark", "amoled" to "AMOLED", "light" to "Light").forEach { (mode, label) ->
+                        val isSelected = themeMode == mode
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(if (isSelected) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainer)
+                                .clickable { onThemeChange(mode) }
+                                .padding(vertical = 10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
                 }
             }
             item {
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    text = "Downloads",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainer)
+                        .padding(14.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    CinePrefs.ACCENT_OPTIONS.forEachIndexed { idx, color ->
+                        val isSelected = accentIndex == idx
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(color)
+                                .clickable { onAccentChange(idx) },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (isSelected) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(12.dp)
+                                        .clip(CircleShape)
+                                        .background(Color.White)
+                                )
+                            }
+                        }
+                    }
+                }
             }
             item {
-                SettingsRow(
-                    icon = Icons.Default.Folder,
-                    title = "Download folder",
-                    subtitle = if (folderName.isBlank()) {
-                        "Choose a folder for saved movies and episodes"
-                    } else {
-                        folderName
+                SwitchSettingsRow(
+                    title = "Reduce motion",
+                    subtitle = "Turn off animations",
+                    checked = reduceMotion,
+                    onCheckedChange = {
+                        reduceMotion = it
+                        CinePrefs.setReduceMotion(context, it)
                     },
-                    onClick = { folderLauncher.launch(null) },
+                    reduceMotion = reduceMotion
+                )
+            }
+
+            // ABOUT
+            item {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = "ABOUT",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
                 )
             }
             item {
                 SettingsRow(
                     icon = Icons.Default.Delete,
-                    title = "Clear completed downloads",
-                    subtitle = "Delete saved files and remove them from Downloads",
+                    title = "Clear watch history",
+                    subtitle = "Remove resume progress and history >",
                     onClick = {
-                        CineDownloads.removeAllCompleted(context)
-                        downloadCount = CineDownloads.list(context).size
-                        Toast.makeText(context, "Completed downloads cleared", Toast.LENGTH_SHORT).show()
-                    },
-                )
-            }
-            if (downloadCount > 0) {
-                item {
-                    Text(
-                        text = "$downloadCount saved item${if (downloadCount == 1) "" else "s"}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            item {
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    text = "Playback",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            item {
-                SettingsRow(
-                    icon = Icons.Default.PlayArrow,
-                    title = "mpv player settings",
-                    subtitle = "Decoder, subtitles, audio and gesture options",
-                    onClick = {
-                        context.startActivity(Intent(context, PreferenceActivity::class.java))
-                    },
-                )
-            }
-            item {
-                SettingsRow(
-                    icon = Icons.Default.Tv,
-                    title = "Playback quality",
-                    subtitle = CinePrefs.qualityLabel(quality) +
-                        " · streams adapt to this cap",
-                    onClick = { showQuality = true },
-                )
-            }
-            item {
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    text = "Updates & About",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        CineLibrary.clearAll(context)
+                        cleared = true
+                        Toast.makeText(context, "Watch history cleared", Toast.LENGTH_SHORT).show()
+                    }
                 )
             }
             item {
                 SettingsRow(
                     icon = Icons.Default.Refresh,
                     title = "Check for updates",
-                    subtitle = if (checkingUpdate) "Checking GitHub for updates..." else "Check for new app releases (${CineUpdateChecker.CURRENT_VERSION_TAG})",
+                    subtitle = if (checkingUpdate) "Checking GitHub for updates..." else "Check for new releases >",
                     onClick = {
                         if (checkingUpdate) return@SettingsRow
                         checkingUpdate = true
@@ -1376,29 +1561,16 @@ private fun SettingsContent(
                                 ).show()
                             }
                         }
-                    },
+                    }
                 )
             }
             item {
-                Spacer(Modifier.height(8.dp))
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-                Spacer(Modifier.height(8.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        Icons.Default.Info,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.width(10.dp))
-                    Column {
-                        Text("CineVerse ${CineUpdateChecker.CURRENT_VERSION_TAG}", fontWeight = FontWeight.Medium)
-                        Text(
-                            "Catalogue by Cinemeta · playback by libmpv",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
+                SettingsRow(
+                    icon = Icons.Default.Info,
+                    title = "Version",
+                    subtitle = "${CineUpdateChecker.CURRENT_VERSION_TAG} >",
+                    onClick = { }
+                )
             }
         }
     }
