@@ -485,9 +485,8 @@ private fun HomeContent(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        // Movies shown in the hero are warmed in the background, so tapping
-        // Watch on the home screen starts mpv immediately.
+    Column(modifier = Modifier.fillMaxSize()) {
+        HomeTopBar(onSearch = onSearch, onSettings = onSettings)
         val focus = heroFocus
         if (focus != null && !focus.isSeries) {
             PrefetchStream(title = focus, season = null, episode = null)
@@ -513,6 +512,31 @@ private fun HomeContent(
                 }
             }
 
+            item(key = "categoryPills") {
+                var selectedCategory by remember { mutableStateOf("For you") }
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(listOf("For you", "Movies", "Series", "Anime")) { cat ->
+                        val isSelected = selectedCategory == cat
+                        val pillBg = if (isSelected) Color.White else MaterialTheme.colorScheme.surfaceVariant
+                        val textColor = if (isSelected) Color.Black else MaterialTheme.colorScheme.onSurfaceVariant
+                        Text(
+                            text = cat,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            color = textColor,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(pillBg)
+                                .clickable { selectedCategory = cat }
+                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                        )
+                    }
+                }
+            }
+
             if (resumable.isNotEmpty()) {
                 item(key = "continue") {
                     Column(modifier = Modifier.padding(top = 4.dp)) {
@@ -522,24 +546,12 @@ private fun HomeContent(
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
                             items(resumable, key = { it.first.key }) { (entry, progress, stub) ->
-                                Column(
-                                    modifier = Modifier
-                                        .width(124.dp)
-                                        .clickable { onOpen(stub) }
-                                ) {
-                                    PosterCard(
-                                        title = stub,
-                                        progress = progress,
-                                        onClick = { onOpen(stub) },
-                                        modifier = Modifier.width(124.dp),
-                                    )
-                                    Text(
-                                        text = "Resume ${formatDuration(progress.positionMs)}",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.primary,
-                                        maxLines = 1,
-                                    )
-                                }
+                                ContinueWatchingCard(
+                                    entry = entry,
+                                    progress = progress,
+                                    titleStub = stub,
+                                    onClick = { onOpen(stub) }
+                                )
                             }
                         }
                     }
@@ -603,8 +615,6 @@ private fun HomeContent(
                 }
             }
         }
-
-        HomeTopBar(onSearch = onSearch, onSettings = onSettings)
     }
 }
 

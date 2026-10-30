@@ -71,7 +71,7 @@ import coil.compose.AsyncImage
 import kotlinx.coroutines.delay
 
 val PosterPlaceholder = Brush.linearGradient(
-    listOf(Color(0xFF202030), Color(0xFF0F0F1A))
+    listOf(Color(0xFF2B1F2D), Color(0xFF14121A))
 )
 
 val EaseEntrance = CubicBezierEasing(0.2f, 0.8f, 0.2f, 1.0f)
@@ -117,7 +117,7 @@ fun AnimatedEntrance(
     }
 }
 
-/** 7. Toggle switches: 48x28 track, 22px knob that slides 20px with slight spring overshoot */
+/** 7. Toggle switch: 48x28 track, 22px knob that slides 20px with spring overshoot */
 @Composable
 fun CustomSwitch(
     checked: Boolean,
@@ -317,14 +317,14 @@ fun PosterCard(
                 scaleX = scale
                 scaleY = scale
             }
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(16.dp))
             .clickable(interactionSource = interactionSource, indication = null) { onClick() }
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(2f / 3f)
-                .clip(RoundedCornerShape(14.dp))
+                .clip(RoundedCornerShape(16.dp))
         ) {
             PosterImage(
                 url = title.poster,
@@ -332,6 +332,7 @@ fun PosterCard(
                 modifier = Modifier.fillMaxSize()
             )
 
+            // Rating badge top-right inside card
             if (!title.rating.isNullOrBlank()) {
                 Text(
                     text = "★ ${title.rating}",
@@ -343,9 +344,28 @@ fun PosterCard(
                         .padding(6.dp)
                         .clip(RoundedCornerShape(6.dp))
                         .background(Color(0xCC000000))
-                        .padding(horizontal = 5.dp, vertical = 2.dp)
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
                 )
             }
+
+            // Title overlay bottom-left inside card
+            Text(
+                text = title.name,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .fillMaxWidth()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color.Transparent, Color(0xCC000000))
+                        )
+                    )
+                    .padding(8.dp)
+            )
 
             if (progress != null && progress.isResumable) {
                 AnimatedProgressBar(
@@ -375,6 +395,85 @@ fun PosterCard(
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1
+        )
+    }
+}
+
+/** Continue Watching Card with wide aspect ratio & bottom progress bar */
+@Composable
+fun ContinueWatchingCard(
+    entry: HistoryEntry,
+    progress: CineProgress,
+    titleStub: CineTitle,
+    reduceMotion: Boolean = false,
+    onClick: () -> Unit
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed && !reduceMotion) 0.95f else 1.0f,
+        animationSpec = spring(stiffness = Spring.StiffnessHigh),
+        label = "cardScale"
+    )
+
+    Column(
+        modifier = Modifier
+            .width(160.dp)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .clickable(interactionSource = interactionSource, indication = null) { onClick() }
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(100.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(Color(0xFF282838))
+        ) {
+            PosterImage(
+                url = entry.poster,
+                contentDescription = entry.name,
+                modifier = Modifier.fillMaxSize()
+            )
+
+            // Title Overlay bottom-left inside
+            Text(
+                text = entry.name,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .fillMaxWidth()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color.Transparent, Color(0xDD000000))
+                        )
+                    )
+                    .padding(8.dp)
+            )
+
+            AnimatedProgressBar(
+                fraction = progress.fraction,
+                reduceMotion = reduceMotion,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(horizontal = 4.dp, vertical = 2.dp)
+            )
+        }
+
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = entry.subtitle.ifBlank { "Resume ${formatDuration(progress.positionMs)}" },
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
     }
 }
@@ -427,10 +526,8 @@ fun HeroCarousel(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(280.dp)
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-            .clip(RoundedCornerShape(20.dp))
-            .background(Color(0xFF141422))
+            .height(260.dp)
+            .background(Color(0xFF3D1B28))
             .clickable { onOpen(currentTitle) }
     ) {
         HorizontalPager(
@@ -455,7 +552,7 @@ fun HeroCarousel(
                         .fillMaxSize()
                         .background(
                             Brush.verticalGradient(
-                                colors = listOf(Color.Transparent, Color(0xEC0E0E17)),
+                                colors = listOf(Color.Transparent, Color(0xF13D1B28)),
                                 startY = 40f
                             )
                         )
@@ -470,33 +567,24 @@ fun HeroCarousel(
         ) {
             Text(
                 text = "New & Popular",
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
+                color = Color.White
             )
 
             Spacer(Modifier.height(2.dp))
 
             Text(
-                text = currentTitle.name,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-
-            Text(
                 text = listOfNotNull(
+                    currentTitle.name,
                     currentTitle.year.takeIf { it.isNotBlank() },
-                    if (currentTitle.isSeries) "Series" else "Movie",
                     currentTitle.rating?.let { "★ $it" }
                 ).joinToString(" · "),
-                style = MaterialTheme.typography.labelSmall,
-                color = Color.LightGray
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color(0xDDFFFFFF)
             )
 
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(12.dp))
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 PrimaryPlayButton(
@@ -535,8 +623,8 @@ fun HeroCarousel(
         // 3. Carousel indicators: inactive 14px, active 34px pill with filling bar
         Row(
             modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(14.dp),
+                .align(Alignment.BottomEnd)
+                .padding(16.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -571,7 +659,7 @@ fun PosterRow(
 ) {
     if (items.isEmpty()) return
 
-    Column(modifier = Modifier.padding(vertical = 6.dp)) {
+    Column(modifier = Modifier.padding(vertical = 8.dp)) {
         SectionHeader(title = title, onSeeAll = onSeeAll)
         LazyRow(
             contentPadding = PaddingValues(horizontal = 16.dp),
@@ -612,6 +700,7 @@ fun SectionHeader(
             Text(
                 text = "See all",
                 style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.clickable { onSeeAll() }
             )
@@ -625,8 +714,8 @@ fun FilterPill(
     selected: Boolean,
     onClick: () -> Unit
 ) {
-    val bg = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
-    val textColor = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+    val bg = if (selected) Color.White else MaterialTheme.colorScheme.surfaceVariant
+    val textColor = if (selected) Color.Black else MaterialTheme.colorScheme.onSurfaceVariant
 
     Text(
         text = label,
@@ -637,7 +726,7 @@ fun FilterPill(
             .clip(RoundedCornerShape(20.dp))
             .background(bg)
             .clickable { onClick() }
-            .padding(horizontal = 14.dp, vertical = 8.dp)
+            .padding(horizontal = 16.dp, vertical = 8.dp)
     )
 }
 
