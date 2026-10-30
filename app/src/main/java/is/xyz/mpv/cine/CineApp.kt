@@ -42,7 +42,10 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
@@ -73,6 +76,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -727,31 +731,155 @@ private fun titleStub(entry: HistoryEntry): CineTitle = CineTitle(
 
 @Composable
 private fun BrowseContent(onOpen: (CineTitle) -> Unit) {
-    var type by remember { mutableStateOf("movie") }
-    var genre by remember { mutableStateOf("Action") }
+    var type by remember { mutableStateOf("all") }
+    var genre by remember { mutableStateOf("All") }
+    var sort by remember { mutableStateOf("top") }
+    var minRating by remember { mutableFloatStateOf(0f) }
+    var showSortMenu by remember { mutableStateOf(false) }
+
+    val catalogType = when (type) {
+        "movie" -> "movie"
+        "series" -> "series"
+        "anime" -> "series"
+        else -> "movie"
+    }
+
+    val catalogGenre = if (genre == "All") {
+        if (type == "anime") "Animation" else null
+    } else genre
 
     Column(modifier = Modifier.fillMaxSize()) {
         AppHeader(title = "Browse")
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            FilterPill("Movies", type == "movie") { type = "movie" }
-            FilterPill("Series", type == "series") { type = "series" }
-        }
+
+        // 1. Type Selector Pills
         LazyRow(
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(listOf("all" to "All", "movie" to "Movies", "series" to "Series", "anime" to "Anime")) { (key, label) ->
+                FilterPill(label, type == key) { type = key }
+            }
+        }
+
+        // 2. Genre Selector Pills
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            items(BROWSE_GENRES, key = { it }) { name ->
+            items(listOf("All") + BROWSE_GENRES, key = { it }) { name ->
                 FilterPill(name, genre == name) { genre = name }
             }
         }
+
+        // 3. Sort & Rating Filter Bar
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box {
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .clickable { showSortMenu = true }
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Sort: " + when (sort) {
+                            "imdbRating" -> "Top rated"
+                            "year" -> "Newest"
+                            else -> "Popular"
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+
+                DropdownMenu(
+                    expanded = showSortMenu,
+                    onDismissRequest = { showSortMenu = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Popular") },
+                        onClick = { sort = "top"; showSortMenu = false }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Top rated") },
+                        onClick = { sort = "imdbRating"; showSortMenu = false }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Newest") },
+                        onClick = { sort = "year"; showSortMenu = false }
+                    )
+                }
+            }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOf(0f to "★ All", 7f to "★ 7+", 8f to "★ 8+").forEach { (thresh, label) ->
+                    val isSelected = minRating == thresh
+                    val bg = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
+                    val textCol = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = textCol,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(bg)
+                            .clickable { minRating = thresh }
+                            .padding(horizontal = 10.dp, vertical = 5.dp)
+                    )
+                }
+            }
+        }
+
+        // Active Filters Tag Bar
+        if (type != "all" || genre != "All" || minRating > 0f) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "Active: " + listOfNotNull(
+                        type.takeIf { it != "all" }?.replaceFirstChar { it.uppercase() },
+                        genre.takeIf { it != "All" },
+                        if (minRating > 0f) "★ ${minRating.toInt()}+" else null
+                    ).joinToString(" · "),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = "Clear all",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.clickable {
+                        type = "all"
+                        genre = "All"
+                        minRating = 0f
+                        sort = "top"
+                    }
+                )
+            }
+        }
+
         CatalogGrid(
-            type = type,
-            catalog = "top",
-            genre = genre,
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 20.dp),
+            type = catalogType,
+            catalog = sort,
+            genre = catalogGenre,
+            minRating = minRating,
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 24.dp),
             onOpen = onOpen,
         )
     }
@@ -785,6 +913,7 @@ private fun CatalogGrid(
     type: String,
     catalog: String,
     genre: String? = null,
+    minRating: Float = 0f,
     progressMap: Map<String, CineProgress> = emptyMap(),
     contentPadding: PaddingValues = PaddingValues(16.dp),
     onOpen: (CineTitle) -> Unit,
@@ -804,10 +933,15 @@ private fun CatalogGrid(
         endReached = items.size < 45
     }
 
+    val filteredItems = remember(items, minRating) {
+        if (minRating <= 0f) items
+        else items.filter { (it.rating?.toFloatOrNull() ?: 0f) >= minRating }
+    }
+
     val shouldLoadMore by remember {
         derivedStateOf {
             val last = gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-            last >= items.size - 8
+            last >= filteredItems.size - 8
         }
     }
 
@@ -830,7 +964,7 @@ private fun CatalogGrid(
             CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
         }
 
-        items.isEmpty() -> EmptyState("Nothing here yet", "Try another genre or category.")
+        filteredItems.isEmpty() -> EmptyState("Nothing here yet", "Try another genre or filter.")
 
         else -> LazyVerticalGrid(
             state = gridState,
@@ -840,7 +974,7 @@ private fun CatalogGrid(
             verticalArrangement = Arrangement.spacedBy(14.dp),
             modifier = Modifier.fillMaxSize(),
         ) {
-            gridItems(items, key = { it.id }) { item ->
+            gridItems(filteredItems, key = { it.id }) { item ->
                 PosterCard(
                     title = item,
                     progress = progressMap[playbackKey(item.id, null, null)],
