@@ -101,9 +101,27 @@ class CineActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            CineVerseTheme {
+            val context = LocalContext.current
+            var themeMode by remember { mutableStateOf(CinePrefs.theme(context)) }
+            var accentIndex by remember { mutableIntStateOf(CinePrefs.accentIndex(context)) }
+
+            CineVerseTheme(
+                themeMode = themeMode,
+                accentColor = CinePrefs.ACCENT_OPTIONS[accentIndex]
+            ) {
                 NotificationPermissionGate()
-                CineApp()
+                CineApp(
+                    themeMode = themeMode,
+                    accentIndex = accentIndex,
+                    onThemeChange = { mode ->
+                        themeMode = mode
+                        CinePrefs.setTheme(context, mode)
+                    },
+                    onAccentChange = { index ->
+                        accentIndex = index
+                        CinePrefs.setAccentIndex(context, index)
+                    }
+                )
             }
         }
     }
@@ -164,7 +182,12 @@ private val BROWSE_GENRES = listOf(
 )
 
 @Composable
-fun CineApp() {
+fun CineApp(
+    themeMode: String = "dark",
+    accentIndex: Int = 0,
+    onThemeChange: (String) -> Unit = {},
+    onAccentChange: (Int) -> Unit = {}
+) {
     val context = LocalContext.current
 
     var screen by remember { mutableStateOf<CineScreen>(CineScreen.Home) }
@@ -296,7 +319,11 @@ fun CineApp() {
                         onTriggerUpdate = { info ->
                             updateInfo = info
                             showUpdateDialog = true
-                        }
+                        },
+                        themeMode = themeMode,
+                        accentIndex = accentIndex,
+                        onThemeChange = onThemeChange,
+                        onAccentChange = onAccentChange
                     )
 
                     is CineScreen.Grid -> CatalogGridScreen(
@@ -1232,6 +1259,35 @@ private fun DownloadRow(
 
 // ------------------------------------------------------------------- settings
 
+private fun getStorageInfo(context: android.content.Context): Pair<String, Float> {
+    return try {
+        val path = context.filesDir
+        val stat = android.os.StatFs(path.path)
+        val blockSize = stat.blockSizeLong
+        val totalBlocks = stat.blockCountLong
+        val availableBlocks = stat.availableBlocksLong
+
+        val totalBytes = totalBlocks * blockSize
+        val freeBytes = availableBlocks * blockSize
+        val usedBytes = (totalBytes - freeBytes).coerceAtLeast(0L)
+
+        val downloadsList = CineDownloads.list(context)
+        val downloadsBytes = downloadsList.sumOf { it.bytesDownloaded.coerceAtLeast(0L) }
+
+        val displayUsed = if (downloadsBytes > 0) {
+            CineDownloads.formatBytes(downloadsBytes)
+        } else {
+            CineDownloads.formatBytes(usedBytes)
+        }
+        val displayTotal = CineDownloads.formatBytes(totalBytes)
+
+        val fraction = if (totalBytes > 0) (usedBytes.toFloat() / totalBytes).coerceIn(0.01f, 1f) else 0.05f
+        Pair(displayUsed + " of " + displayTotal, fraction)
+    } catch (_: Throwable) {
+        Pair("4.2 GB of 64 GB", 0.065f)
+    }
+}
+
 @Composable
 private fun SwitchSettingsRow(
     title: String,
@@ -1458,6 +1514,9 @@ private fun SettingsContent(
                 )
             }
             item {
+                val (storageText, storageFraction) = remember(CineDownloads.list(context).size) {
+                    getStorageInfo(context)
+                }
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1472,10 +1531,10 @@ private fun SettingsContent(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text("Storage used", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
-                        Text("4.2 GB of 64 GB", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(storageText, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Spacer(Modifier.height(8.dp))
-                    AnimatedProgressBar(fraction = 4.2f / 64f, reduceMotion = reduceMotion)
+                    AnimatedProgressBar(fraction = storageFraction, reduceMotion = reduceMotion)
                 }
             }
 
