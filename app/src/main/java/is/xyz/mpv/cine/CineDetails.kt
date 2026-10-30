@@ -1,5 +1,7 @@
 package `is`.xyz.mpv.cine
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -27,8 +29,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.PlayArrow
+import android.content.Context
 import android.widget.Toast
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -74,6 +78,27 @@ fun DetailsContent(
     var retryTick by remember(id) { mutableStateOf(0) }
     var season by remember(id) { mutableStateOf(0) }
 
+    val context = LocalContext.current
+    var pendingDownload by remember(id) { mutableStateOf<DownloadTarget?>(null) }
+    var downloadTick by remember(id) { mutableStateOf(0) }
+    val folderLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        if (uri != null) {
+            CineDownloads.setTreeUri(context, uri)
+            Toast.makeText(context, "Download folder set", Toast.LENGTH_SHORT).show()
+            pendingDownload?.let { startDownload(context, it) }
+        }
+        pendingDownload = null
+    }
+
+    LaunchedEffect(id) {
+        while (true) {
+            kotlinx.coroutines.delay(1_500)
+            downloadTick++
+        }
+    }
+
     LaunchedEffect(id, retryTick) {
         loading = true
         error = null
@@ -114,6 +139,19 @@ fun DetailsContent(
     val seasons = loaded.videos.map { it.season }.distinct().sorted()
     val episodes = loaded.videos.filter { it.season == season }
     val prefetchEpisode = if (loaded.isSeries) episodes.minByOrNull { it.episode } else null
+
+    val titleDownloads = remember(downloadTick, loaded.id) {
+        CineDownloads.list(context).filter { it.titleId == loaded.id }
+    }
+
+    fun requestDownload(target: DownloadTarget) {
+        if (CineDownloads.hasTree(context)) {
+            startDownload(context, target)
+        } else {
+            pendingDownload = target
+            folderLauncher.launch(null)
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         // Warm the stream while the user is still reading, so Watch plays at once.
@@ -257,26 +295,63 @@ fun DetailsContent(
                             )
                         }
                         Spacer(Modifier.width(10.dp))
+                        val firstEpisode = loaded.videos
+                            .minByOrNull { it.season * 1000 + it.episode }
+                        val mainTarget = if (loaded.isSeries && firstEpisode != null) {
+                            DownloadTarget(
+                                title = loaded,
+                                season = firstEpisode.season,
+                                episode = firstEpisode.episode,
+                                label = "${loaded.name} · ${firstEpisode.label}",
+                            )
+                        } else {
+                            DownloadTarget(loaded, null, null, loaded.name)
+                        }
+                        val mainDownload = titleDownloads.firstOrNull {
+                            if (loaded.isSeries) it.season == mainTarget.season && it.episode == mainTarget.episode
+                            else !it.isSeriesEpisode
+                        }
                         Box(
                             modifier = Modifier
                                 .size(42.dp)
                                 .clip(CircleShape)
                                 .background(MaterialTheme.colorScheme.surfaceVariant)
                                 .clickable {
-                                    Toast.makeText(
-                                        context,
-                                        "Download queued: ${loaded.name}",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
+                                    when {
+                                        mainDownload?.isComplete == true -> Toast.makeText(
+                                            context,
+                                            "Already downloaded",
+                                            Toast.LENGTH_SHORT,
+                                        ).show()
+                                        mainDownload?.isActive == true -> Toast.makeText(
+                                            context,
+                                            "Download in progress",
+                                            Toast.LENGTH_SHORT,
+                                        ).show()
+                                        else -> requestDownload(mainTarget)
+                                    }
                                 },
                             contentAlignment = Alignment.Center,
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Download,
-                                contentDescription = "Download",
-                                tint = Color.White,
-                                modifier = Modifier.size(20.dp),
-                            )
+                            when {
+                                mainDownload?.isComplete == true -> Icon(
+                                    imageVector = Icons.Default.CheckCircle,
+                                    contentDescription = "Downloaded",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                                mainDownload?.isActive == true -> CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                                else -> Icon(
+                                    imageVector = Icons.Default.Download,
+                                    contentDescription = "Download",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
                         }
                     }
                 }
@@ -367,6 +442,19 @@ fun DetailsContent(
                             "${loaded.name} · ${episode.label}",
                         )
                     },
+                    download = titleDownloads.firstOrNull {
+                        it.season == episode.season && it.episode == episode.episode
+                    },
+                    onDownload = {
+                        requestDownload(
+                            DownloadTarget(
+                                title = loaded,
+                                season = episode.season,
+                                episode = episode.episode,
+                                label = "${loaded.name} · ${episode.label}",
+                            )
+                        )
+                    },
                 )
             }
         }
@@ -414,8 +502,10 @@ private fun SeasonPill(label: String, selected: Boolean, onClick: () -> Unit) {
 private fun EpisodeCard(
     episode: CineEpisode,
     progress: CineProgress?,
+    download: CineDownload?,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
+    onDownload: () -> Unit,
 ) {
     Row(
         modifier = Modifier
@@ -483,6 +573,36 @@ private fun EpisodeCard(
                 overflow = TextOverflow.Ellipsis,
             )
         }
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .clip(CircleShape)
+                .clickable(enabled = download?.isActive != true && download?.isComplete != true) {
+                    onDownload()
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            when {
+                download?.isComplete == true -> Icon(
+                    Icons.Default.CheckCircle,
+                    contentDescription = "Downloaded",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp),
+                )
+                download?.isActive == true -> CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                else -> Icon(
+                    Icons.Default.Download,
+                    contentDescription = "Download episode",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+        }
+        Spacer(Modifier.width(6.dp))
         Icon(
             Icons.Default.PlayArrow,
             contentDescription = "Play",
@@ -536,4 +656,34 @@ fun StreamDialog(
             TextButton(onClick = onDismiss) { Text("Cancel") }
         },
     )
+}
+
+/** A movie or episode the user asked to download. */
+private data class DownloadTarget(
+    val title: CineTitle,
+    val season: Int?,
+    val episode: Int?,
+    val label: String,
+)
+
+/**
+ * Resolves the best source through the normal provider flow and hands the
+ * resulting stream URL to the download service.
+ */
+private fun startDownload(context: Context, target: DownloadTarget) {
+    try {
+        context.startActivity(
+            CineResolverActivity.intent(
+                context = context,
+                title = target.title,
+                season = target.season,
+                episode = target.episode,
+                label = target.label,
+                download = true,
+            )
+        )
+        Toast.makeText(context, "Finding best source…", Toast.LENGTH_SHORT).show()
+    } catch (t: Throwable) {
+        Toast.makeText(context, "Could not start the download", Toast.LENGTH_LONG).show()
+    }
 }

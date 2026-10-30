@@ -1,11 +1,16 @@
 package `is`.xyz.mpv.cine
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -37,9 +42,15 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
@@ -48,6 +59,7 @@ import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -77,6 +89,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import `is`.xyz.mpv.preferences.PreferenceActivity
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.async
@@ -89,8 +102,28 @@ class CineActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             CineVerseTheme {
+                NotificationPermissionGate()
                 CineApp()
             }
+        }
+    }
+}
+
+/** Asks for notification permission so download progress can be shown. */
+@Composable
+private fun NotificationPermissionGate() {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+    val context = LocalContext.current
+    val launcher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { }
+    LaunchedEffect(Unit) {
+        val granted = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.POST_NOTIFICATIONS,
+        ) == PackageManager.PERMISSION_GRANTED
+        if (!granted) {
+            runCatching { launcher.launch(Manifest.permission.POST_NOTIFICATIONS) }
         }
     }
 }
@@ -100,6 +133,7 @@ sealed interface CineScreen {
     data object Browse : CineScreen
     data object Search : CineScreen
     data object Library : CineScreen
+    data object Downloads : CineScreen
     data object Settings : CineScreen
     data class Details(val id: String, val type: String) : CineScreen
     data class Grid(
@@ -148,7 +182,7 @@ fun CineApp() {
 
     LaunchedEffect(Unit) {
         val info = CineUpdateChecker.checkForUpdates()
-        if (info.isUpdateAvailable) {
+        if (info.isUpdateAvailable && info.tagName != CinePrefs.dismissedUpdate(context)) {
             updateInfo = info
             showUpdateDialog = true
         }
@@ -253,6 +287,10 @@ fun CineApp() {
                         onRemove = { toggleSave(it) },
                     )
 
+                    is CineScreen.Downloads -> DownloadsContent(
+                        onOpen = { openDetails(it) },
+                    )
+
                     is CineScreen.Settings -> SettingsContent(
                         onBack = { screen = CineScreen.Home },
                         onTriggerUpdate = { info ->
@@ -345,7 +383,10 @@ fun CineApp() {
                             }
                         },
                         dismissButton = {
-                            TextButton(onClick = { showUpdateDialog = false }) {
+                            TextButton(onClick = {
+                                showUpdateDialog = false
+                                CinePrefs.dismissUpdate(context, info.tagName)
+                            }) {
                                 Text("Later")
                             }
                         }
@@ -378,6 +419,9 @@ private fun CineBottomBar(current: CineScreen, onSelect: (CineScreen) -> Unit) {
         BottomItem(Icons.Default.Search, "Search", current is CineScreen.Search) {
             onSelect(CineScreen.Search)
         }
+        BottomItem(Icons.Default.Download, "Downloads", current is CineScreen.Downloads) {
+            onSelect(CineScreen.Downloads)
+        }
         BottomItem(Icons.Default.Bookmark, "My list", current is CineScreen.Library) {
             onSelect(CineScreen.Library)
         }
@@ -396,7 +440,7 @@ private fun BottomItem(
         modifier = Modifier
             .clip(RoundedCornerShape(14.dp))
             .clickable { onClick() }
-            .padding(horizontal = 20.dp, vertical = 6.dp),
+            .padding(horizontal = 8.dp, vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Icon(icon, contentDescription = label, tint = tint, modifier = Modifier.size(22.dp))
@@ -967,6 +1011,206 @@ private fun LibraryContent(
     }
 }
 
+// ------------------------------------------------------------------ downloads
+
+@Composable
+private fun DownloadsContent(onOpen: (CineTitle) -> Unit) {
+    val context = LocalContext.current
+    var tick by remember { mutableIntStateOf(0) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(600)
+            tick++
+        }
+    }
+    val downloads = remember(tick) { CineDownloads.list(context) }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        AppHeader(title = "Downloads")
+        if (downloads.isEmpty()) {
+            EmptyState(
+                "No downloads yet",
+                "Open a movie or episode and tap the download button. Files are saved to your chosen folder.",
+            )
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 24.dp),
+            ) {
+                items(downloads, key = { it.id }) { task ->
+                    DownloadRow(
+                        task = task,
+                        onPlay = {
+                            val uri = task.fileUri?.let { android.net.Uri.parse(it) }
+                            if (uri != null) {
+                                CinePlayer.playLocal(
+                                    context,
+                                    CineDownloads.titleStub(task),
+                                    task.key,
+                                    task.label,
+                                    uri,
+                                )
+                            }
+                        },
+                        onOpenWith = {
+                            val uri = task.fileUri?.let { android.net.Uri.parse(it) }
+                            if (uri != null) {
+                                CinePlayer.openWithExternal(context, uri, task.label)
+                            }
+                        },
+                        onDelete = {
+                            CineDownloads.remove(context, task.id)
+                            tick++
+                        },
+                        onCancel = {
+                            CineDownloadService.cancel(context, task.id)
+                            tick++
+                        },
+                        onRetry = {
+                            if (!CineDownloads.hasTree(context)) {
+                                Toast.makeText(
+                                    context,
+                                    "Choose a download folder in Settings first",
+                                    Toast.LENGTH_LONG,
+                                ).show()
+                            } else {
+                                CineDownloads.remove(context, task.id)
+                                val title = CineDownloads.titleStub(task)
+                                context.startActivity(
+                                    CineResolverActivity.intent(
+                                        context,
+                                        title,
+                                        task.season,
+                                        task.episode,
+                                        task.label,
+                                        download = true,
+                                    )
+                                )
+                            }
+                        },
+                        onOpenDetails = { onOpen(CineDownloads.titleStub(task)) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DownloadRow(
+    task: CineDownload,
+    onPlay: () -> Unit,
+    onOpenWith: () -> Unit,
+    onDelete: () -> Unit,
+    onCancel: () -> Unit,
+    onRetry: () -> Unit,
+    onOpenDetails: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .width(62.dp)
+                    .height(93.dp)
+                    .clip(RoundedCornerShape(9.dp))
+                    .clickable { onOpenDetails() }
+            ) {
+                PosterImage(
+                    url = task.poster,
+                    contentDescription = task.label,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = task.label,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(3.dp))
+                Text(
+                    text = when (task.status) {
+                        CineDownload.STATUS_COMPLETED ->
+                            "Saved · ${CineDownloads.formatBytes(task.bytesDownloaded)}"
+                        CineDownload.STATUS_DOWNLOADING ->
+                            "Downloading · ${CineDownloads.formatBytes(task.bytesDownloaded)}"
+                        CineDownload.STATUS_QUEUED -> "Preparing…"
+                        CineDownload.STATUS_CANCELED -> "Canceled"
+                        else -> task.error ?: "Download failed"
+                    },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = when (task.status) {
+                        CineDownload.STATUS_COMPLETED -> MaterialTheme.colorScheme.primary
+                        CineDownload.STATUS_FAILED -> MaterialTheme.colorScheme.error
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (task.status == CineDownload.STATUS_DOWNLOADING) {
+                    Spacer(Modifier.height(6.dp))
+                    LinearProgressIndicator(
+                        progress = { task.progress.coerceIn(0f, 1f) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(4.dp)
+                            .clip(RoundedCornerShape(2.dp)),
+                    )
+                }
+            }
+            Spacer(Modifier.width(8.dp))
+            when (task.status) {
+                CineDownload.STATUS_COMPLETED -> Icon(
+                    Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+                CineDownload.STATUS_FAILED -> Icon(
+                    Icons.Default.ErrorOutline,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                )
+                else -> Icon(
+                    Icons.Default.Download,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 4.dp),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            when {
+                task.isComplete -> {
+                    TextButton(onClick = onPlay) { Text("Play") }
+                    TextButton(onClick = onOpenWith) { Text("Open with") }
+                    TextButton(onClick = onDelete) { Text("Delete") }
+                }
+                task.isActive -> {
+                    TextButton(onClick = onCancel) { Text("Cancel") }
+                }
+                else -> {
+                    TextButton(onClick = onRetry) { Text("Retry") }
+                    TextButton(onClick = onDelete) { Text("Remove") }
+                }
+            }
+        }
+    }
+}
+
 // ------------------------------------------------------------------- settings
 
 @Composable
@@ -980,6 +1224,17 @@ private fun SettingsContent(
     var quality by remember { mutableStateOf(CinePrefs.quality(context)) }
     var showQuality by remember { mutableStateOf(false) }
     var checkingUpdate by remember { mutableStateOf(false) }
+    var folderName by remember { mutableStateOf(CineDownloads.treeName(context)) }
+    var downloadCount by remember { mutableIntStateOf(CineDownloads.list(context).size) }
+    val folderLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        if (uri != null) {
+            CineDownloads.setTreeUri(context, uri)
+            folderName = CineDownloads.treeName(context)
+            Toast.makeText(context, "Download folder set", Toast.LENGTH_SHORT).show()
+        }
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         AppHeader(title = "Settings", onBack = onBack)
@@ -1021,6 +1276,47 @@ private fun SettingsContent(
                         text = "Caches cleared.",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+            item {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = "Downloads",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            item {
+                SettingsRow(
+                    icon = Icons.Default.Folder,
+                    title = "Download folder",
+                    subtitle = if (folderName.isBlank()) {
+                        "Choose a folder for saved movies and episodes"
+                    } else {
+                        folderName
+                    },
+                    onClick = { folderLauncher.launch(null) },
+                )
+            }
+            item {
+                SettingsRow(
+                    icon = Icons.Default.Delete,
+                    title = "Clear completed downloads",
+                    subtitle = "Delete saved files and remove them from Downloads",
+                    onClick = {
+                        CineDownloads.removeAllCompleted(context)
+                        downloadCount = CineDownloads.list(context).size
+                        Toast.makeText(context, "Completed downloads cleared", Toast.LENGTH_SHORT).show()
+                    },
+                )
+            }
+            if (downloadCount > 0) {
+                item {
+                    Text(
+                        text = "$downloadCount saved item${if (downloadCount == 1) "" else "s"}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }

@@ -9,6 +9,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
+import `is`.xyz.mpv.BuildConfig
 
 data class CineUpdateInfo(
     val tagName: String,
@@ -21,7 +22,9 @@ data class CineUpdateInfo(
 
 object CineUpdateChecker {
     private const val GITHUB_API_URL = "https://api.github.com/repos/Riju2007123/CineVerse/releases/latest"
-    const val CURRENT_VERSION_TAG = "v1.0.0"
+
+    /** Always derived from the installed APK, never hard-coded. */
+    val CURRENT_VERSION_TAG: String = "v" + BuildConfig.VERSION_NAME.removePrefix("v")
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
@@ -106,8 +109,8 @@ object CineUpdateChecker {
 
         if (latestClean == currentClean) return false
 
-        val latestParts = latestClean.split(".").mapNotNull { it.toIntOrNull() }
-        val currentParts = currentClean.split(".").mapNotNull { it.toIntOrNull() }
+        val latestParts = versionParts(latestClean)
+        val currentParts = versionParts(currentClean)
 
         val length = maxOf(latestParts.size, currentParts.size)
         for (i in 0 until length) {
@@ -118,6 +121,14 @@ object CineUpdateChecker {
         }
         return false
     }
+
+    /**
+     * Splits a version into numeric components, ignoring flavour suffixes such
+     * as "1.0.1-allstorage" or pre-release tags like "1.2.0-beta2".
+     */
+    private fun versionParts(value: String): List<Int> =
+        value.split(".", "-", "+", " ")
+            .mapNotNull { part -> Regex("\\d+").find(part)?.value?.toIntOrNull() }
 
     fun openUpdateUrl(context: Context, updateInfo: CineUpdateInfo) {
         val targetUrl = updateInfo.apkUrl.ifBlank { updateInfo.releaseUrl }

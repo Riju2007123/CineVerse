@@ -52,6 +52,8 @@ class CineResolverActivity : ComponentActivity() {
         private const val EXTRA_SEASON = "season"
         private const val EXTRA_EPISODE = "episode"
         private const val EXTRA_START_MS = "start_ms"
+        private const val EXTRA_DOWNLOAD = "download"
+        private const val EXTRA_POSTER = "poster"
 
         private const val PER_SOURCE_TIMEOUT_MS = 12_000L
 
@@ -62,6 +64,7 @@ class CineResolverActivity : ComponentActivity() {
             episode: Int?,
             label: String,
             startMs: Int = 0,
+            download: Boolean = false,
         ): Intent = Intent(context, CineResolverActivity::class.java).apply {
             putExtra(EXTRA_IMDB, title.id)
             putExtra(EXTRA_TMDB, title.tmdbId ?: 0)
@@ -70,6 +73,8 @@ class CineResolverActivity : ComponentActivity() {
             putExtra(EXTRA_SEASON, season ?: 0)
             putExtra(EXTRA_EPISODE, episode ?: 0)
             putExtra(EXTRA_LABEL, label)
+            putExtra(EXTRA_POSTER, title.poster)
+            putExtra(EXTRA_DOWNLOAD, download)
             if (startMs > 0) putExtra(EXTRA_START_MS, startMs)
         }
     }
@@ -98,6 +103,9 @@ class CineResolverActivity : ComponentActivity() {
     private var episodeNumber: Int = 0
     private var startMs: Int = 0
     private var userAgent: String = HlsPlaylist.defaultUserAgent
+    private var downloadMode: Boolean = false
+    private var poster: String? = null
+    private var titleName: String = ""
 
     private val tried = HashSet<String>()
 
@@ -119,10 +127,13 @@ class CineResolverActivity : ComponentActivity() {
         imdbId = imdb
         tmdbId = tmdb
         typeName = type
+        titleName = name
         seasonNumber = season ?: 0
         episodeNumber = episode ?: 0
         startMs = intent.getIntExtra(EXTRA_START_MS, 0)
-        if (startMs <= 0) {
+        downloadMode = intent.getBooleanExtra(EXTRA_DOWNLOAD, false)
+        poster = intent.getStringExtra(EXTRA_POSTER)
+        if (startMs <= 0 && !downloadMode) {
             val saved = CineLibrary.progress(this, cacheKey)
             if (saved != null && saved.isResumable) {
                 startMs = (saved.positionMs - 2_000L).coerceAtLeast(0L).toInt()
@@ -193,7 +204,7 @@ class CineResolverActivity : ComponentActivity() {
 
     /** Waits for the prefetcher's stream, then falls back to a real resolve. */
     private fun awaitPrefetch() {
-        statusView.text = "Starting the player…"
+        statusView.text = if (downloadMode) "Preparing download…" else "Starting the player…"
         Thread {
             val deadline = System.currentTimeMillis() + 10_000L
             while (System.currentTimeMillis() < deadline) {
@@ -263,7 +274,7 @@ class CineResolverActivity : ComponentActivity() {
         )
 
         statusView = TextView(this).apply {
-            text = "Starting playback…"
+            text = if (downloadMode) "Preparing download…" else "Starting playback…"
             setTextColor(Color.parseColor("#B9B9C9"))
             textSize = 13f
             gravity = Gravity.CENTER
@@ -470,6 +481,42 @@ class CineResolverActivity : ComponentActivity() {
         CineStreamCache.put(this, cacheKey, url, referer, variant = isVariant)
 
         val cookie = runCatching { CookieManager.getInstance().getCookie(url) }.getOrNull()
+
+        if (downloadMode) {
+            val title = CineTitle(
+                id = imdbId,
+                type = typeName,
+                name = titleName.ifBlank { label },
+                poster = poster,
+                background = poster,
+                logo = null,
+                description = null,
+                genres = emptyList(),
+                rating = null,
+                releaseInfo = null,
+                runtime = null,
+                cast = emptyList(),
+                director = emptyList(),
+                tmdbId = tmdbId.takeIf { it > 0 },
+            )
+            val task = CineDownloads.newTask(
+                title = title,
+                key = cacheKey,
+                label = label,
+                season = seasonNumber.takeIf { it > 0 },
+                episode = episodeNumber.takeIf { it > 0 },
+                streamUrl = url,
+                referer = referer,
+                userAgent = userAgent,
+                cookie = cookie,
+            )
+            CineDownloads.enqueue(this, task)
+            CineDownloadService.start(this, task.id)
+            Toast.makeText(this, "Download started: $label", Toast.LENGTH_LONG).show()
+            finish()
+            return
+        }
+
         val intent = Intent(this, MPVActivity::class.java).apply {
             action = Intent.ACTION_VIEW
             data = android.net.Uri.parse(url)

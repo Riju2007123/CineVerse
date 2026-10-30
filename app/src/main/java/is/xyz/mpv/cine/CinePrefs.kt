@@ -6,6 +6,7 @@ import android.content.Context
 object CinePrefs {
     private const val PREFS = "cineverse"
     private const val KEY_QUALITY = "quality"
+    private const val KEY_DISMISSED_UPDATE = "dismissed_update"
 
     const val QUALITY_AUTO = "auto"
 
@@ -45,4 +46,26 @@ object CinePrefs {
     }
 
     fun qualityNames(): Array<String> = QUALITY_OPTIONS.map { qualityLabel(it) }.toTypedArray()
+
+    // --------------------------------------------------------------- updates
+
+    fun dismissedUpdate(context: Context): String =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getString(KEY_DISMISSED_UPDATE, null)
+            .orEmpty()
+
+    fun dismissUpdate(context: Context, tag: String) {
+        if (tag.isBlank()) return
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putString(KEY_DISMISSED_UPDATE, tag)
+            .apply()
+    }
+
+    fun clearDismissedUpdate(context: Context) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .remove(KEY_DISMISSED_UPDATE)
+            .apply()
+    }
 }
