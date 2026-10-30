@@ -1243,8 +1243,8 @@ private fun SwitchSettingsRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .clip(RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
             .clickable { onCheckedChange(!checked) }
             .padding(14.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -1282,8 +1282,9 @@ private fun SettingsContent(
     var wifiOnly by remember { mutableStateOf(CinePrefs.wifiOnly(context)) }
     var reduceMotion by remember { mutableStateOf(CinePrefs.reduceMotion(context)) }
 
-    var userName by remember { mutableStateOf("Jack") }
+    var userName by remember { mutableStateOf(CinePrefs.userName(context)) }
     var showEditProfile by remember { mutableStateOf(false) }
+    var showSyncStatus by remember { mutableStateOf(false) }
     var showAudioSubs by remember { mutableStateOf(false) }
     var audioSubChoice by remember { mutableStateOf("English · Off") }
     var showDownloadQuality by remember { mutableStateOf(false) }
@@ -1294,7 +1295,7 @@ private fun SettingsContent(
     ) { uri ->
         if (uri != null) {
             CineDownloads.setTreeUri(context, uri)
-            Toast.makeText(context, "Download folder set", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Download folder updated", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -1311,7 +1312,7 @@ private fun SettingsContent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(16.dp))
-                        .background(MaterialTheme.colorScheme.surfaceContainer)
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
                         .padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -1323,14 +1324,18 @@ private fun SettingsContent(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "J",
+                            text = userName.take(1).uppercase(),
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
                         )
                     }
                     Spacer(Modifier.width(14.dp))
-                    Column(modifier = Modifier.weight(1f)) {
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { showSyncStatus = true }
+                    ) {
                         Text(
                             text = userName,
                             style = MaterialTheme.typography.titleMedium,
@@ -1347,10 +1352,10 @@ private fun SettingsContent(
                         text = "Edit",
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier
                             .clip(RoundedCornerShape(12.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
                             .clickable { showEditProfile = true }
                             .padding(horizontal = 14.dp, vertical = 6.dp)
                     )
@@ -1454,8 +1459,8 @@ private fun SettingsContent(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.surfaceContainer)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
                         .clickable { folderLauncher.launch(null) }
                         .padding(14.dp)
                 ) {
@@ -1493,16 +1498,16 @@ private fun SettingsContent(
                             modifier = Modifier
                                 .weight(1f)
                                 .clip(RoundedCornerShape(14.dp))
-                                .background(if (isSelected) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainer)
+                                .background(if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
                                 .clickable { onThemeChange(mode) }
-                                .padding(vertical = 10.dp),
+                                .padding(vertical = 12.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 text = label,
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -1513,7 +1518,7 @@ private fun SettingsContent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(14.dp))
-                        .background(MaterialTheme.colorScheme.surfaceContainer)
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
                         .padding(14.dp),
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -1671,7 +1676,11 @@ private fun SettingsContent(
             },
             confirmButton = {
                 TextButton(onClick = {
-                    if (tempName.isNotBlank()) userName = tempName
+                    if (tempName.isNotBlank()) {
+                        userName = tempName
+                        CinePrefs.setUserName(context, tempName)
+                        Toast.makeText(context, "Profile updated: $tempName", Toast.LENGTH_SHORT).show()
+                    }
                     showEditProfile = false
                 }) { Text("Save") }
             },

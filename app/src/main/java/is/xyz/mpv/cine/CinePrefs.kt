@@ -16,6 +16,7 @@ object CinePrefs {
     private const val KEY_SKIP_INTRO = "skip_intro"
     private const val KEY_WIFI_ONLY = "wifi_only"
     private const val KEY_DOWNLOAD_QUALITY = "download_quality"
+    private const val KEY_USER_NAME = "user_name"
 
     const val QUALITY_AUTO = "auto"
     val QUALITY_OPTIONS = listOf(QUALITY_AUTO, "1080", "720", "480", "360")
@@ -128,6 +129,15 @@ object CinePrefs {
     fun setDownloadQuality(context: Context, value: String) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit().putString(KEY_DOWNLOAD_QUALITY, value).apply()
+    }
+
+    fun userName(context: Context): String =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getString(KEY_USER_NAME, "Jack") ?: "Jack"
+
+    fun setUserName(context: Context, value: String) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().putString(KEY_USER_NAME, value).apply()
     }
 
     fun dismissedUpdate(context: Context): String =
