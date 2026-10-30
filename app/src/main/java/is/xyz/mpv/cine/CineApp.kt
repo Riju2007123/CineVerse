@@ -34,6 +34,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -513,6 +514,19 @@ private fun HomeContent(
     }
 
     val listState = rememberLazyListState()
+    var selectedCategory by remember { mutableStateOf("For you") }
+
+    val context = LocalContext.current
+    val reduceMotion = remember { CinePrefs.reduceMotion(context) }
+
+    val displayedRows = remember(rows, selectedCategory) {
+        when (selectedCategory) {
+            "Movies" -> rows.filter { it.first.type == "movie" }
+            "Series" -> rows.filter { it.first.type == "series" }
+            "Anime" -> rows.filter { it.first.genre?.contains("Animation", ignoreCase = true) == true || it.first.title.contains("Anime", ignoreCase = true) }
+            else -> rows
+        }
+    }
 
     LaunchedEffect(Unit) {
         listState.scrollToItem(0, 0)
@@ -531,63 +545,70 @@ private fun HomeContent(
         ) {
             if (hero.isNotEmpty()) {
                 item(key = "hero") {
-                    HeroCarousel(
-                        titles = hero,
-                        savedIds = savedIds,
-                        onOpen = onOpen,
-                        onPlay = onPlay,
-                        onToggleSave = onToggleSave,
-                        onPageChange = { candidate ->
-                            val alreadyWarm = warmedIds.contains(candidate.id)
-                            if (!candidate.isSeries && (alreadyWarm || warmedIds.size < 4)) {
-                                warmedIds.add(candidate.id)
-                                heroFocus = candidate
-                            }
-                        },
-                    )
+                    AnimatedEntrance(index = 0, reduceMotion = reduceMotion) {
+                        HeroCarousel(
+                            titles = hero,
+                            savedIds = savedIds,
+                            onOpen = onOpen,
+                            onPlay = onPlay,
+                            onToggleSave = onToggleSave,
+                            reduceMotion = reduceMotion,
+                            onPageChange = { candidate ->
+                                val alreadyWarm = warmedIds.contains(candidate.id)
+                                if (!candidate.isSeries && (alreadyWarm || warmedIds.size < 4)) {
+                                    warmedIds.add(candidate.id)
+                                    heroFocus = candidate
+                                }
+                            },
+                        )
+                    }
                 }
             }
 
             item(key = "categoryPills") {
-                var selectedCategory by remember { mutableStateOf("For you") }
-                LazyRow(
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(listOf("For you", "Movies", "Series", "Anime")) { cat ->
-                        val isSelected = selectedCategory == cat
-                        val pillBg = if (isSelected) Color.White else MaterialTheme.colorScheme.surfaceVariant
-                        val textColor = if (isSelected) Color.Black else MaterialTheme.colorScheme.onSurfaceVariant
-                        Text(
-                            text = cat,
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            color = textColor,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(20.dp))
-                                .background(pillBg)
-                                .clickable { selectedCategory = cat }
-                                .padding(horizontal = 16.dp, vertical = 8.dp)
-                        )
+                AnimatedEntrance(index = 1, reduceMotion = reduceMotion) {
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(listOf("For you", "Movies", "Series", "Anime")) { cat ->
+                            val isSelected = selectedCategory == cat
+                            val pillBg = if (isSelected) Color.White else MaterialTheme.colorScheme.surfaceVariant
+                            val textColor = if (isSelected) Color.Black else MaterialTheme.colorScheme.onSurfaceVariant
+                            Text(
+                                text = cat,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                color = textColor,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .background(pillBg)
+                                    .clickable { selectedCategory = cat }
+                                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                            )
+                        }
                     }
                 }
             }
 
             if (resumable.isNotEmpty()) {
                 item(key = "continue") {
-                    Column(modifier = Modifier.padding(top = 4.dp)) {
-                        SectionHeader("Continue watching")
-                        LazyRow(
-                            contentPadding = PaddingValues(horizontal = 16.dp),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        ) {
-                            items(resumable, key = { it.first.key }) { (entry, progress, stub) ->
-                                ContinueWatchingCard(
-                                    entry = entry,
-                                    progress = progress,
-                                    titleStub = stub,
-                                    onClick = { onOpen(stub) }
-                                )
+                    AnimatedEntrance(index = 2, reduceMotion = reduceMotion) {
+                        Column(modifier = Modifier.padding(top = 4.dp)) {
+                            SectionHeader("Continue watching")
+                            LazyRow(
+                                contentPadding = PaddingValues(horizontal = 16.dp),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                items(resumable, key = { it.first.key }) { (entry, progress, stub) ->
+                                    ContinueWatchingCard(
+                                        entry = entry,
+                                        progress = progress,
+                                        titleStub = stub,
+                                        reduceMotion = reduceMotion,
+                                        onClick = { onOpen(stub) }
+                                    )
+                                }
                             }
                         }
                     }
@@ -630,14 +651,16 @@ private fun HomeContent(
                 }
             }
 
-            items(rows, key = { it.first.title }) { (spec, items) ->
-                PosterRow(
-                    title = spec.title,
-                    items = items,
-                    progressMap = progressMap,
-                    onOpen = onOpen,
-                    onSeeAll = { onSeeAll(spec) },
-                )
+            itemsIndexed(displayedRows, key = { _, item -> item.first.title }) { idx, (spec, items) ->
+                AnimatedEntrance(index = idx + 3, reduceMotion = reduceMotion) {
+                    PosterRow(
+                        title = spec.title,
+                        items = items,
+                        progressMap = progressMap,
+                        onOpen = onOpen,
+                        onSeeAll = { onSeeAll(spec) },
+                    )
+                }
             }
 
             item(key = "footer") {
