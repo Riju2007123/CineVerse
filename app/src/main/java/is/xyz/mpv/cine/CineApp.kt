@@ -422,8 +422,8 @@ private fun CineBottomBar(current: CineScreen, onSelect: (CineScreen) -> Unit) {
         BottomItem(Icons.Default.Download, "Downloads", current is CineScreen.Downloads) {
             onSelect(CineScreen.Downloads)
         }
-        BottomItem(Icons.Default.Bookmark, "My list", current is CineScreen.Library) {
-            onSelect(CineScreen.Library)
+        BottomItem(Icons.Default.Settings, "Settings", current is CineScreen.Settings) {
+            onSelect(CineScreen.Settings)
         }
     }
 }
@@ -485,6 +485,12 @@ private fun HomeContent(
         }
     }
 
+    val listState = rememberLazyListState()
+
+    LaunchedEffect(Unit) {
+        listState.scrollToItem(0, 0)
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
         HomeTopBar(onSearch = onSearch, onSettings = onSettings)
         val focus = heroFocus
@@ -492,7 +498,10 @@ private fun HomeContent(
             PrefetchStream(title = focus, season = null, episode = null)
         }
 
-        LazyColumn(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize()
+        ) {
             if (hero.isNotEmpty()) {
                 item(key = "hero") {
                     HeroCarousel(
@@ -1273,6 +1282,13 @@ private fun SettingsContent(
     var wifiOnly by remember { mutableStateOf(CinePrefs.wifiOnly(context)) }
     var reduceMotion by remember { mutableStateOf(CinePrefs.reduceMotion(context)) }
 
+    var userName by remember { mutableStateOf("Jack") }
+    var showEditProfile by remember { mutableStateOf(false) }
+    var showAudioSubs by remember { mutableStateOf(false) }
+    var audioSubChoice by remember { mutableStateOf("English · Off") }
+    var showDownloadQuality by remember { mutableStateOf(false) }
+    var downloadQualityChoice by remember { mutableStateOf(CinePrefs.downloadQuality(context)) }
+
     val folderLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
     ) { uri ->
@@ -1316,7 +1332,7 @@ private fun SettingsContent(
                     Spacer(Modifier.width(14.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Jack",
+                            text = userName,
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
@@ -1335,7 +1351,7 @@ private fun SettingsContent(
                         modifier = Modifier
                             .clip(RoundedCornerShape(12.dp))
                             .background(MaterialTheme.colorScheme.surfaceVariant)
-                            .clickable { }
+                            .clickable { showEditProfile = true }
                             .padding(horizontal = 14.dp, vertical = 6.dp)
                     )
                 }
@@ -1395,6 +1411,14 @@ private fun SettingsContent(
                     onClick = { showQuality = true }
                 )
             }
+            item {
+                SettingsRow(
+                    icon = Icons.Default.Tv,
+                    title = "Audio & subtitles",
+                    subtitle = "$audioSubChoice >",
+                    onClick = { showAudioSubs = true }
+                )
+            }
 
             // DOWNLOADS
             item {
@@ -1422,8 +1446,8 @@ private fun SettingsContent(
                 SettingsRow(
                     icon = Icons.Default.Download,
                     title = "Download quality",
-                    subtitle = "Standard >",
-                    onClick = { }
+                    subtitle = "$downloadQualityChoice >",
+                    onClick = { showDownloadQuality = true }
                 )
             }
             item {
@@ -1432,6 +1456,7 @@ private fun SettingsContent(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
                         .background(MaterialTheme.colorScheme.surfaceContainer)
+                        .clickable { folderLauncher.launch(null) }
                         .padding(14.dp)
                 ) {
                     Row(
@@ -1627,6 +1652,97 @@ private fun SettingsContent(
             confirmButton = {
                 TextButton(onClick = { showQuality = false }) { Text("Close") }
             },
+        )
+    }
+
+    if (showEditProfile) {
+        var tempName by remember { mutableStateOf(userName) }
+        AlertDialog(
+            onDismissRequest = { showEditProfile = false },
+            title = { Text("Edit Profile Name") },
+            text = {
+                OutlinedTextField(
+                    value = tempName,
+                    onValueChange = { tempName = it },
+                    label = { Text("Name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (tempName.isNotBlank()) userName = tempName
+                    showEditProfile = false
+                }) { Text("Save") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEditProfile = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    if (showAudioSubs) {
+        val choices = listOf("English · Off", "English · English", "Japanese · English", "Spanish · Off", "French · Off")
+        AlertDialog(
+            onDismissRequest = { showAudioSubs = false },
+            title = { Text("Audio & Subtitles") },
+            text = {
+                Column {
+                    choices.forEach { choice ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable {
+                                    audioSubChoice = choice
+                                    showAudioSubs = false
+                                }
+                                .padding(vertical = 8.dp, horizontal = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(selected = choice == audioSubChoice, onClick = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text(choice, style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showAudioSubs = false }) { Text("Close") }
+            }
+        )
+    }
+
+    if (showDownloadQuality) {
+        val qualities = listOf("Standard", "High", "Low")
+        AlertDialog(
+            onDismissRequest = { showDownloadQuality = false },
+            title = { Text("Download Quality") },
+            text = {
+                Column {
+                    qualities.forEach { q ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable {
+                                    downloadQualityChoice = q
+                                    CinePrefs.setDownloadQuality(context, q)
+                                    showDownloadQuality = false
+                                }
+                                .padding(vertical = 8.dp, horizontal = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(selected = q == downloadQualityChoice, onClick = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text(q, style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showDownloadQuality = false }) { Text("Close") }
+            }
         )
     }
 }
